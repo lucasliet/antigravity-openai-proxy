@@ -71,6 +71,7 @@ Deno.test('@DisplayName("Criação de chat completion sem streaming")', async ()
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': 'Bearer mock-refresh-token',
       },
       body: JSON.stringify(payload),
     });

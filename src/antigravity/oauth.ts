@@ -1,32 +1,31 @@
 import { ANTIGRAVITY_ENDPOINTS } from './types.ts';
 import { ENV } from '../util/env.ts';
 
-interface TokenState {
+interface TokenEntry {
   accessToken: string;
   expiresAt: number;
-  projectId: string;
+  projectId?: string;
 }
 
-const state: TokenState = {
-  accessToken: '',
-  expiresAt: 0,
-  projectId: ENV.projectId,
-};
+const tokenCache = new Map<string, TokenEntry>();
 
 /**
- * Retrieves a valid Google OAuth access token, refreshing it if it's expired or about to expire.
+ * Retrieves a valid Google OAuth access token for a given refresh token, 
+ * refreshing it if it's expired or about to expire.
  * Includes a 60-second buffer before actual expiration.
  *
+ * @param refreshToken - The Google OAuth refresh token to use.
  * @returns A promise that resolves to a valid access token.
- * @throws Error if ANTIGRAVITY_REFRESH_TOKEN is not set or if the refresh request fails.
+ * @throws Error if the refresh request fails.
  */
-export async function getAccessToken(): Promise<string> {
-  if (!ENV.refreshToken) {
-    throw new Error('ANTIGRAVITY_REFRESH_TOKEN is not set');
+export async function getAccessToken(refreshToken: string): Promise<string> {
+  if (!refreshToken) {
+    throw new Error('No refresh token provided');
   }
 
-  if (state.accessToken && state.expiresAt > Date.now()) {
-    return state.accessToken;
+  const cached = tokenCache.get(refreshToken);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.accessToken;
   }
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
@@ -35,7 +34,7 @@ export async function getAccessToken(): Promise<string> {
     body: new URLSearchParams({
       client_id: ENV.clientId,
       client_secret: ENV.clientSecret,
-      refresh_token: ENV.refreshToken,
+      refresh_token: refreshToken,
       grant_type: 'refresh_token',
     }),
   });
@@ -46,23 +45,32 @@ export async function getAccessToken(): Promise<string> {
   }
 
   const data = await response.json();
-  state.accessToken = data.access_token;
-  state.expiresAt = Date.now() + (data.expires_in * 1000) - 60_000;
+  const accessToken = data.access_token;
+  const expiresAt = Date.now() + (data.expires_in * 1000) - 60_000;
 
-  return state.accessToken;
+  if (cached) {
+    cached.accessToken = accessToken;
+    cached.expiresAt = expiresAt;
+  } else {
+    tokenCache.set(refreshToken, { accessToken, expiresAt });
+  }
+
+  return accessToken;
 }
 
 /**
- * Retrieves the Antigravity project ID. If not explicitly set in the environment,
- * it attempts to discover it by calling an internal Antigravity endpoint.
+ * Retrieves the Antigravity project ID for a given refresh token. 
+ * If not already cached, it attempts to discover it 
+ * by calling an internal Antigravity endpoint.
  *
- * @returns A promise that resolves to the Antigravity project ID.
- * @throws Error if discovery fails and no project ID is provided in the environment.
+ * @param refreshToken - The Google OAuth refresh token.
+ * @returns A promise that resolves to the Antigravity project ID or undefined if discovery fails.
  */
-export async function getProjectId(): Promise<string> {
-  if (state.projectId) return state.projectId;
+export async function getProjectId(refreshToken: string): Promise<string | undefined> {
+  const cached = tokenCache.get(refreshToken);
+  if (cached?.projectId) return cached.projectId;
 
-  const token = await getAccessToken();
+  const token = await getAccessToken(refreshToken);
 
   for (const endpoint of ANTIGRAVITY_ENDPOINTS) {
     try {
@@ -88,8 +96,11 @@ export async function getProjectId(): Promise<string> {
           : data.cloudaicompanionProject?.id;
 
         if (projectId) {
-          state.projectId = projectId;
-          console.log(`[OAuth] Discovered project: ${projectId}`);
+          const entry = tokenCache.get(refreshToken);
+          if (entry) {
+            entry.projectId = projectId;
+          }
+          console.log(`[OAuth] Discovered project for token: ${projectId}`);
           return projectId;
         }
       }
@@ -98,5 +109,5 @@ export async function getProjectId(): Promise<string> {
     }
   }
 
-  throw new Error('Could not discover Antigravity project ID. Set ANTIGRAVITY_PROJECT_ID env var.');
+  return undefined;
 }

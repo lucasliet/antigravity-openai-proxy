@@ -3,20 +3,6 @@
  */
 export const ENV = {
   /**
-   * Google OAuth refresh token.
-   * @returns The refresh token string.
-   */
-  get refreshToken(): string {
-    return Deno.env.get('ANTIGRAVITY_REFRESH_TOKEN') || '';
-  },
-  /**
-   * Google Cloud Project ID.
-   * @returns The project ID string.
-   */
-  get projectId(): string {
-    return Deno.env.get('ANTIGRAVITY_PROJECT_ID') || '';
-  },
-  /**
    * Google OAuth Client ID.
    * @returns The client ID string.
    */

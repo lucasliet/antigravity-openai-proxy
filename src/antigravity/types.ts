@@ -24,7 +24,7 @@ export interface GeminiContent {
 }
 
 export interface AntigravityRequestPayload {
-  project: string;
+  project?: string;
   model: string;
   userAgent: string;
   requestId: string;

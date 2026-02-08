@@ -1,5 +1,4 @@
 import { ANTIGRAVITY_ENDPOINTS } from './types.ts';
-import { getAccessToken } from './oauth.ts';
 
 const HEADERS_BASE = {
   'Content-Type': 'application/json',
@@ -14,14 +13,15 @@ const HEADERS_BASE = {
  * Makes a request to the Antigravity API with endpoint fallback.
  *
  * @param payload - The request payload.
+ * @param accessToken - Valid Google OAuth access token.
  * @param endpointIndex - Current endpoint index for retry logic.
  * @returns Promise resolving to the API response.
  */
 export async function makeAntigravityRequest(
   payload: Record<string, unknown>,
+  accessToken: string,
   endpointIndex = 0,
 ): Promise<Response> {
-  const accessToken = await getAccessToken();
   const endpoint = ANTIGRAVITY_ENDPOINTS[endpointIndex];
   const url = `${endpoint}/v1internal:streamGenerateContent?alt=sse`;
 
@@ -36,7 +36,7 @@ export async function makeAntigravityRequest(
 
   if ((response.status === 429 || response.status >= 500) && endpointIndex < ANTIGRAVITY_ENDPOINTS.length - 1) {
     console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, trying next...`);
-    return makeAntigravityRequest(payload, endpointIndex + 1);
+    return makeAntigravityRequest(payload, accessToken, endpointIndex + 1);
   }
 
   if (!response.ok) {

@@ -7,7 +7,7 @@ import {
 } from '../antigravity/types.ts';
 import { toGeminiFormat, toGeminiTools } from '../antigravity/transformer.ts';
 import { makeAntigravityRequest } from '../antigravity/client.ts';
-import { getProjectId } from '../antigravity/oauth.ts';
+import { getAccessToken, getProjectId } from '../antigravity/oauth.ts';
 import { transformGeminiToOpenAIStream } from '../antigravity/streamTransformer.ts';
 
 /**
@@ -17,6 +17,13 @@ import { transformGeminiToOpenAIStream } from '../antigravity/streamTransformer.
  * @returns Response object in OpenAI format.
  */
 export async function chatCompletions(c: Context): Promise<Response> {
+  const authHeader = c.req.header('Authorization') || '';
+  const refreshToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  if (!refreshToken) {
+    return c.json({ error: { message: 'Missing API key (Authorization: Bearer <refresh_token>)' } }, 401);
+  }
+
   let body: OpenAIChatRequest;
   try {
     body = await c.req.json<OpenAIChatRequest>();
@@ -53,7 +60,9 @@ export async function chatCompletions(c: Context): Promise<Response> {
       };
     }
 
-    const projectId = await getProjectId();
+    const projectId = await getProjectId(refreshToken);
+    const accessToken = await getAccessToken(refreshToken);
+
     const payload: AntigravityRequestPayload = {
       project: projectId,
       model,
@@ -76,7 +85,7 @@ export async function chatCompletions(c: Context): Promise<Response> {
       },
     };
 
-    const response = await makeAntigravityRequest(payload as unknown as Record<string, unknown>);
+    const response = await makeAntigravityRequest(payload as unknown as Record<string, unknown>, accessToken);
 
     if (!response.body) {
       return c.json({ error: { message: 'No response body from Antigravity' } }, 502);
