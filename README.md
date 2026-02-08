@@ -1,42 +1,60 @@
 # Antigravity OpenAI Proxy
 
-Um proxy leve para converter requisições no formato **OpenAI API** para a API interna do **Antigravity** (Google Cloud Code/Gemini).
+Um proxy leve e eficiente para converter requisições no formato **OpenAI API** para a API interna do **Antigravity** (Google Cloud Code / Gemini). Este projeto permite usar modelos como Gemini 3 e Claude através de ferramentas que suportam apenas o padrão OpenAI.
 
-## ✨ Funcionalidades
+## 🌟 Principais Funcionalidades
 
-- **Multi-usuário**: Suporta múltiplos tokens de refresh via cabeçalho `Authorization`.
-- **Compatibilidade OpenAI**: Funciona com o SDK oficial da OpenAI e ferramentas compatíveis.
-- **Streaming**: Suporte total a Server-Sent Events (SSE).
-- **Thinking Support**: Suporte a modelos que geram blocos de pensamento (Gemini 3, Claude).
-- **Tool Calling**: Conversão de definições de ferramentas (JSON Schema) para o formato Gemini/Antigravity.
-- **Failover**: Tentativa automática em múltiplos endpoints (Daily, Autopush, Prod).
+- **Compatibilidade OpenAI:** Use o Antigravity como se fosse o serviço da OpenAI. Compatível com SDKs oficiais, LibreChat, Dify, TypingMind, etc.
+- **Suporte Multi-usuário:** O `refresh_token` do Google é usado como `API Key`, permitindo que múltiplos usuários utilizem o proxy com suas próprias credenciais.
+- **Suporte a Streaming:** Respostas em tempo real via Server-Sent Events (SSE).
+- **Thinking Support:** Preserva e formata blocos de pensamento (reasoning) para modelos que suportam essa funcionalidade (Gemini 3, Claude).
+- **Tool Calling:** Tradução transparente de definições de ferramentas (JSON Schema) e resultados de execução.
+- **Failover Inteligente:** Tentativa automática em múltiplos endpoints da infraestrutura do Google (Daily, Autopush e Prod) para garantir alta disponibilidade.
 
-## 🚀 Como usar
+---
 
-### Pré-requisitos
-- [Deno](https://deno.com/) instalado.
-- Credenciais OAuth do Google (Client ID e Secret).
+## 🚀 Como Começar
 
-### Configuração
+### 1. Pré-requisitos
+- [Deno](https://deno.com/) instalado em sua máquina.
+- Um Google Refresh Token (obtido através do login no Antigravity/Cloud Code).
+- Google OAuth Client ID e Secret (disponíveis no código ou via env).
+
+### 2. Configuração
 Crie um arquivo `.env` baseado no `.env.example`:
-```bash
+```env
 ANTIGRAVITY_CLIENT_ID=seu_client_id
 ANTIGRAVITY_CLIENT_SECRET=seu_client_secret
 PORT=8000
+KEEP_THINKING=false
 ```
 
-### Rodando o Servidor
+### 3. Rodando o Servidor
 ```bash
+# Desenvolvimento (com auto-reload)
 deno task dev
+
+# Produção
+deno task start
 ```
 
-### Exemplo com SDK OpenAI
+---
+
+## 🔌 Conectividade & Uso
+
+| Parâmetro | Valor | Descrição |
+| :--- | :--- | :--- |
+| **Base URL** | `http://localhost:8000/v1` | Endpoint para ferramentas compatíveis com OpenAI |
+| **API Key** | `Bearer <REFRESH_TOKEN>` | Use seu Google Refresh Token como chave |
+
+### Exemplo de Uso (SDK OpenAI)
+
 ```typescript
 import OpenAI from "openai";
 
 const client = new OpenAI({
   baseURL: "http://localhost:8000/v1",
-  apiKey: "seu_google_refresh_token"
+  apiKey: "1//0abc...seu-refresh-token-aqui"
 });
 
 const response = await client.chat.completions.create({
@@ -46,12 +64,41 @@ const response = await client.chat.completions.create({
 });
 ```
 
-## 🧪 Testes
+---
+
+## 🤖 Modelos Suportados
+
+O proxy mapeia automaticamente os modelos para os endpoints corretos do Antigravity:
+
+- `gemini-3-flash`
+- `gemini-3-pro`
+- `claude-sonnet-4-5`
+- `claude-opus-4`
+
+---
+
+## 🧪 Testes Automatizados
+
+Garantimos a estabilidade do proxy através de uma suíte de testes completa:
+
+1. **Testes de Unidade:** Valida a conversão de formatos e limpeza de schemas.
+2. **Testes de Integração:** Simula chamadas reais e valida o fluxo de streaming.
+3. **Testes de Contrato:** Garante que o SDK oficial da OpenAI consegue consumir o proxy sem erros.
 
 ```bash
 deno task test
 ```
 
-## 🛠 Desenvolvimento
+---
 
-Consulte [AGENTS.md](./AGENTS.md) para diretrizes de estilo de código e comandos de desenvolvimento.
+## 🛠️ Desenvolvimento
+
+Este projeto é construído com **Deno** e **Hono**, focado em performance e zero dependências externas pesadas.
+
+Para diretrizes de contribuição, padrões de código e comandos detalhados, consulte o arquivo [AGENTS.md](./AGENTS.md).
+
+### Docker (Opcional)
+```bash
+docker build -t antigravity-proxy .
+docker run -p 8000:8000 --env-file .env antigravity-proxy
+```
