@@ -18,13 +18,10 @@ Um proxy leve e eficiente para converter requisições no formato **OpenAI API**
 ### 1. Pré-requisitos
 - [Deno](https://deno.com/) instalado em sua máquina.
 - Um Google Refresh Token (obtido através do login no Antigravity/Cloud Code).
-- Google OAuth Client ID e Secret (disponíveis no código ou via env).
 
 ### 2. Configuração
 Crie um arquivo `.env` baseado no `.env.example`:
 ```env
-ANTIGRAVITY_CLIENT_ID=seu_client_id
-ANTIGRAVITY_CLIENT_SECRET=seu_client_secret
 PORT=8000
 KEEP_THINKING=false
 ```

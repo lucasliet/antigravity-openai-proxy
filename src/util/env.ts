@@ -6,16 +6,12 @@ export const ENV = {
    * Google OAuth Client ID.
    * @returns The client ID string.
    */
-  get clientId(): string {
-    return Deno.env.get('ANTIGRAVITY_CLIENT_ID') || '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
-  },
+  clientId: '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com',
   /**
    * Google OAuth Client Secret.
    * @returns The client secret string.
    */
-  get clientSecret(): string {
-    return Deno.env.get('ANTIGRAVITY_CLIENT_SECRET') || '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';
-  },
+  clientSecret: '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',
   /**
    * Server listening port.
    * @returns The port number.

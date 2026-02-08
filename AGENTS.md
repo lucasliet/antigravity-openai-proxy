@@ -56,7 +56,7 @@ This project uses **Deno**.
 - For API routes, return clear JSON error responses with appropriate HTTP status codes (400, 401, 404, 500).
 
 ### 7. Security
-- Never hardcode secrets. Use `src/util/env.ts` to access environment variables.
+- Use `src/util/env.ts` to access environment variables.
 - Ensure all routes requiring authentication extract the token from the `Authorization` header.
 
 ## 🧪 Test Conventions
@@ -90,8 +90,6 @@ Deno.test('@DisplayName("Conversão de mensagem de sistema")', () => {
 
 Accessed via `ENV` object in `src/util/env.ts`:
 - `PORT`: Server port.
-- `ANTIGRAVITY_CLIENT_ID`: OAuth Client ID.
-- `ANTIGRAVITY_CLIENT_SECRET`: OAuth Client Secret.
 - `KEEP_THINKING`: Boolean to preserve thinking blocks.
 - `THINKING_BUDGET`: Token budget for reasoning models.
 
