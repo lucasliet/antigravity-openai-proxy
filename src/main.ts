@@ -1,0 +1,20 @@
+import { Context, Hono } from 'hono';
+import { chatCompletions } from './routes/chatCompletions.ts';
+import { listModels } from './routes/models.ts';
+import { ENV } from './util/env.ts';
+
+export const app = new Hono();
+
+app.get('/', (c: Context) => c.json({ status: 'ok', service: 'antigravity-openai-proxy' }));
+
+app.post('/v1/chat/completions', chatCompletions);
+app.get('/v1/models', listModels);
+
+app.post('/chat/completions', chatCompletions);
+app.get('/models', listModels);
+
+if (import.meta.main) {
+  const port = ENV.port;
+  console.log(`[Proxy] Antigravity OpenAI Proxy listening on port ${port}`);
+  Deno.serve({ port }, app.fetch);
+}

@@ -1,0 +1,16 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --allow-read --watch src/main.ts",
+    "start": "deno run --allow-net --allow-env --allow-read src/main.ts",
+    "test": "deno test --allow-net --allow-env --allow-read tests/"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono@^4.4.0",
+    "hono/streaming": "jsr:@hono/hono@^4.4.0/streaming",
+    "asserts": "https://deno.land/std@0.224.0/assert/mod.ts",
+    "mock": "https://deno.land/std@0.224.0/testing/mock.ts"
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}
