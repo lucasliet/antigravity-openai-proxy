@@ -2,6 +2,7 @@
   "tasks": {
     "dev": "deno run --allow-net --allow-env --allow-read --watch src/main.ts",
     "start": "deno run --allow-net --allow-env --allow-read src/main.ts",
+    "antigravity-login": "deno run --allow-net --allow-env --allow-read src/main.ts antigravity-login",
     "test": "deno test --allow-net --allow-env --allow-read tests/"
   },
   "imports": {

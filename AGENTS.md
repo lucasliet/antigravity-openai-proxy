@@ -8,6 +8,7 @@ This project uses **Deno**.
 
 - **Run development server**: `deno task dev`
 - **Start production server**: `deno task start`
+- **Obtain Google Refresh Token**: `deno task antigravity-login`
 - **Run all tests**: `deno task test`
 - **Run a single test file**: `deno test --allow-net --allow-env --allow-read tests/unit/toGeminiFormat.test.ts`
 - **Run tests matching a pattern**: `deno test --allow-net --allow-env --allow-read --filter "Conversão"`
@@ -93,9 +94,38 @@ Accessed via `ENV` object in `src/util/env.ts`:
 - `KEEP_THINKING`: Boolean to preserve thinking blocks.
 - `THINKING_BUDGET`: Token budget for reasoning models.
 
+## 🔐 Comando antigravity-login
+
+### Como usar
+
+Execute `deno task antigravity-login` para obter um Google Refresh Token através do fluxo OAuth2.
+
+### Como funciona
+
+1. O comando exibe uma URL de autorização OAuth no terminal
+2. Você deve abrir a URL no navegador e autorizar o acesso à conta Google
+3. O navegador redireciona para `http://localhost:9004` com o código de autorização
+4. O servidor local (porta 9004) captura o código e o troca por um refresh token
+5. O refresh token é exibido no terminal
+
+### O que esperar
+
+- Uma URL será exibida no terminal
+- Um servidor local será iniciado na porta 9004
+- Após autorizar no navegador, você verá uma mensagem de sucesso
+- O refresh token será exibido no terminal para copiar
+- Use o refresh token como API Key no header `Authorization: Bearer <TOKEN>`
+
+### Notas
+
+- O servidor na porta 9004 é temporário e encerra após capturar o código
+- O refresh token obtido pode ser usado indefinidamente (não expira)
+- Mantenha o refresh token seguro, pois dá acesso à sua conta Google Cloud
+
 ## 📁 Project Structure
 
 - `src/main.ts`: Application entry point.
+- `src/cli/`: CLI commands (antigravity-login).
 - `src/routes/`: Hono route handlers (Chat Completions, Models).
 - `src/antigravity/`: Core logic for Antigravity API integration.
   - `client.ts`: HTTP client with endpoint fallback.

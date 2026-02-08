@@ -17,16 +17,32 @@ Um proxy leve e eficiente para converter requisições no formato **OpenAI API**
 
 ### 1. Pré-requisitos
 - [Deno](https://deno.com/) instalado em sua máquina.
-- Um Google Refresh Token (obtido através do login no Antigravity/Cloud Code).
 
-### 2. Configuração
+### 2. Obter o Google Refresh Token
+
+O proxy utiliza um Google Refresh Token como API Key. Para obter o seu:
+
+```bash
+deno task antigravity-login
+```
+
+Siga as instruções no terminal:
+1. Uma URL de autorização será exibida
+2. Abra a URL no navegador e faça login com sua conta Google
+3. Autorize o acesso solicitado
+4. O Refresh Token será exibido no terminal
+
+Copie o Refresh Token e use-o como API Key.
+
+### 3. Configuração
+
 Crie um arquivo `.env` baseado no `.env.example`:
 ```env
 PORT=8000
 KEEP_THINKING=false
 ```
 
-### 3. Rodando o Servidor
+### 4. Rodando o Servidor
 ```bash
 # Desenvolvimento (com auto-reload)
 deno task dev

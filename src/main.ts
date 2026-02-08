@@ -2,6 +2,7 @@ import { Context, Hono } from 'hono';
 import { chatCompletions } from './routes/chatCompletions.ts';
 import { listModels } from './routes/models.ts';
 import { ENV } from './util/env.ts';
+import { AntigravityAuth } from './cli/antigravityAuth.ts';
 
 export const app = new Hono();
 
@@ -14,7 +15,12 @@ app.post('/chat/completions', chatCompletions);
 app.get('/models', listModels);
 
 if (import.meta.main) {
-  const port = ENV.port;
-  console.log(`[Proxy] Antigravity OpenAI Proxy listening on port ${port}`);
-  Deno.serve({ port }, app.fetch);
+  if (Deno.args.includes('antigravity-login')) {
+    const auth = new AntigravityAuth();
+    await auth.run();
+  } else {
+    const port = ENV.port;
+    console.log(`[Proxy] Antigravity OpenAI Proxy listening on port ${port}`);
+    Deno.serve({ port }, app.fetch);
+  }
 }
