@@ -87,6 +87,7 @@ export async function makeAntigravityRequest(
           const waitMs = exponentialDelay + jitter;
 
           console.warn(`[Client] Server busy (${reason}) on ${endpoint}, exponential backoff ${waitMs}ms (attempt ${capacityRetryCount + 1})`);
+          await response.body?.cancel();
           await sleep(waitMs);
 
           return makeAntigravityRequest(payload, accessToken, {
@@ -98,11 +99,13 @@ export async function makeAntigravityRequest(
 
       if (i < endpoints.length - 1) {
         console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, trying next...`);
+        await response.body?.cancel();
         continue;
       }
 
       if (style === "antigravity" && !isClaudeModel(model)) {
         console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, will try Gemini CLI fallback...`);
+        await response.body?.cancel();
         continue;
       }
     }

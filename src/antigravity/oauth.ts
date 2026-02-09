@@ -1,5 +1,6 @@
 import { ANTIGRAVITY_ENDPOINTS } from './types.ts';
 import { ENV } from '../util/env.ts';
+import { evictFingerprint, clearFingerprintCache } from './fingerprint.ts';
 
 interface TokenEntry {
   accessToken: string;
@@ -38,6 +39,7 @@ function cleanupExpiredEntries(): void {
   for (const [key, entry] of tokenCache.entries()) {
     if (entry.expiresAt < now) {
       tokenCache.delete(key);
+      evictFingerprint(key);
       cacheMetrics.evictedByCleanup++;
     }
   }
@@ -57,6 +59,7 @@ function evictLRUIfNeeded(): void {
   const toRemove = entries.slice(0, tokenCache.size - MAX_CACHE_SIZE);
   for (const [key] of toRemove) {
     tokenCache.delete(key);
+    evictFingerprint(key);
     cacheMetrics.evictedByLRU++;
   }
 
@@ -113,6 +116,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
 
     if (status === 400 || status === 401) {
       tokenCache.delete(refreshToken);
+      evictFingerprint(refreshToken);
       throw new OAuthError(
         `Invalid refresh token (${status}): ${text}`,
         status,
@@ -196,6 +200,7 @@ export async function getAccessToken(refreshToken: string): Promise<string> {
 export function clearTokenCache(): void {
   tokenCache.clear();
   refreshPromises.clear();
+  clearFingerprintCache();
   cacheMetrics.hits = 0;
   cacheMetrics.misses = 0;
   cacheMetrics.refreshes = 0;

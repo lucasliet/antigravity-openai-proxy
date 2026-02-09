@@ -111,9 +111,14 @@ export async function chatCompletions(c: Context): Promise<Response> {
         const isGemini3Pro = lowerModel.includes('gemini-3-pro');
         const isGemini3Flash = lowerModel.includes('gemini-3-flash');
 
-        const thinkingLevel = isGemini3Pro
-          ? mapReasoningEffortToGemini3Pro(body.reasoning_effort)
-          : mapReasoningEffortToGemini3Flash(body.reasoning_effort);
+        let thinkingLevel: string;
+        if (isGemini3Pro) {
+          thinkingLevel = mapReasoningEffortToGemini3Pro(body.reasoning_effort);
+        } else if (isGemini3Flash) {
+          thinkingLevel = mapReasoningEffortToGemini3Flash(body.reasoning_effort);
+        } else {
+          throw new Error(`Unsupported Gemini 3 model: ${model}`);
+        }
 
         generationConfig.thinkingConfig = {
           thinkingLevel,
