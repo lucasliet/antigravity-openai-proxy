@@ -22,14 +22,15 @@ Deno.test('Deve normalizar modelos Gemini 3 Pro com reasoning_effort', () => {
 
 Deno.test('Deve preservar sufixo existente em modelos Gemini 3 Pro', () => {
   // Given & When & Then
-  assertEquals(normalizeModelForAntigravity('gemini-3-pro-low'), 'gemini-3-pro-low');
   assertEquals(normalizeModelForAntigravity('gemini-3-pro-high'), 'gemini-3-pro-high');
   assertEquals(normalizeModelForAntigravity('gemini-3-pro-medium'), 'gemini-3-pro-medium');
+  assertEquals(normalizeModelForAntigravity('gemini-3-pro-minimal'), 'gemini-3-pro-minimal');
   assertEquals(normalizeModelForAntigravity('gemini-3-pro', 'high'), 'gemini-3-pro-high'); // suffix takes precedence or is preserved? Code says "match suffix", if matches, return model. So input model is returned.
   // Actually, let's verify logic:
-  // if (lower.startsWith('gemini-3-pro') && !lower.match(/-(low|high|medium)$/))
+  // if (lower.startsWith('gemini-3-pro') && !lower.match(/-(low|high|medium|minimal)$/))
   // So if it matches suffix, it skips the block and returns model.
   assertEquals(normalizeModelForAntigravity('gemini-3-pro-low', 'high'), 'gemini-3-pro-low');
+  assertEquals(normalizeModelForAntigravity('gemini-3-pro-minimal', 'high'), 'gemini-3-pro-minimal');
 });
 
 Deno.test('Deve não adicionar sufixo em modelos Gemini 3 Flash', () => {

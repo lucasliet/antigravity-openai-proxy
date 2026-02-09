@@ -53,7 +53,7 @@ export function normalizeModelForAntigravity(
 ): string {
   const lower = model.toLowerCase();
 
-  if (lower.startsWith('gemini-3-pro') && !lower.match(/-(low|high|medium)$/)) {
+  if (lower.startsWith('gemini-3-pro') && !lower.match(/-(low|high|medium|minimal)$/)) {
     return `${model}-${mapReasoningEffortToGemini3Pro(reasoningEffort)}`;
   }
 

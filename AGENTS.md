@@ -250,8 +250,9 @@ deno task test
 
 ### Notas Importantes
 
-- Para **Gemini 3**, o `reasoning_effort` é aplicado via **sufixo no nome do modelo**, não via `generationConfig`
-- Para **Gemini 2.5** e **Claude**, o `reasoning_effort` controla o `thinkingBudget` numérico
+- Para **Gemini 3 Pro**, o `reasoning_effort` é aplicado via **sufixo no nome do modelo** (`-low`, `-high`) + `thinkingLevel` no `generationConfig`
+- Para **Gemini 3 Flash**, o `reasoning_effort` é aplicado **apenas** via `thinkingLevel` no `generationConfig` (sem sufixo no modelo)
+- Para **Gemini 2.5** e **Claude**, o `reasoning_effort` controla o `thinkingBudget` numérico no `generationConfig`
 - A implementação é **backward compatible**: clientes sem o parâmetro funcionam normalmente
 - SDKs OpenAI podem enviar o parâmetro nativamente sem modificações
 

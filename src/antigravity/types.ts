@@ -193,7 +193,7 @@ export function getRandomizedHeaders(style: HeaderStyle): Record<string, string>
 export function resolveModelForHeaderStyle(model: string, style: HeaderStyle): string {
   if (style === "antigravity") return model;
 
-  const withoutTier = model.replace(/-(low|medium|high)$/i, "");
+  const withoutTier = model.replace(/-(low|medium|high|minimal)$/i, "");
 
   if (withoutTier.toLowerCase().includes("gemini-3") && !withoutTier.endsWith("-preview")) {
     return `${withoutTier}-preview`;
