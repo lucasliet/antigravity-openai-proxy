@@ -8,6 +8,7 @@ import { stub } from "mock";
 
 // Dynamic import to ensure env vars are set before src/main.ts (and its dependencies) are loaded
 const { app } = await import("../../src/main.ts");
+const { resetCleanupTimer } = await import("../../src/antigravity/oauth.ts");
 
 Deno.test('@DisplayName("Contrato: Listagem de Modelos via SDK OpenAI")', async () => {
   // Given
@@ -85,6 +86,7 @@ Deno.test('@DisplayName("Contrato: Chat Completions (Sem Streaming) via SDK Open
   } finally {
     fetchStub.restore();
     await server.shutdown();
+    resetCleanupTimer();
   }
 });
 
@@ -149,6 +151,7 @@ Deno.test('@DisplayName("Contrato: Chat Completions (Streaming) via SDK OpenAI")
   } finally {
     fetchStub.restore();
     await server.shutdown();
+    resetCleanupTimer();
   }
 });
 
@@ -229,5 +232,6 @@ Deno.test('@DisplayName("Contrato: Chat Completions com Tool Calls via SDK OpenA
   } finally {
     fetchStub.restore();
     await server.shutdown();
+    resetCleanupTimer();
   }
 });

@@ -3,10 +3,21 @@ import { chatCompletions } from './routes/chatCompletions.ts';
 import { listModels } from './routes/models.ts';
 import { ENV } from './util/env.ts';
 import { AntigravityAuth } from './cli/antigravityAuth.ts';
+import { getCacheMetrics } from './antigravity/oauth.ts';
 
 export const app = new Hono();
 
 app.get('/', (c: Context) => c.json({ status: 'ok', service: 'antigravity-openai-proxy' }));
+
+app.get('/metrics', (c: Context) => {
+  const metrics = getCacheMetrics();
+  return c.json({
+    oauth: {
+      cache: metrics,
+      uptime: Deno.env.get('UPTIME') || 'unknown',
+    },
+  });
+});
 
 app.post('/v1/chat/completions', chatCompletions);
 app.get('/v1/models', listModels);

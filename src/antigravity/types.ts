@@ -59,6 +59,7 @@ export interface OpenAIChatRequest {
   max_tokens?: number;
   top_p?: number;
   stop?: string | string[];
+  reasoning_effort?: 'low' | 'medium' | 'high' | 'minimal';
 }
 
 export interface OpenAIMessage {
@@ -99,6 +100,12 @@ export const ANTIGRAVITY_ENDPOINTS = [
 export const SKIP_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 export const DEFAULT_THINKING_BUDGET = 16000;
 
+export const REASONING_EFFORT_BUDGETS = {
+  low: 8192,
+  medium: 16384,
+  high: 32768,
+} as const;
+
 /**
  * Checks if the given model name refers to a Claude model.
  *
@@ -127,5 +134,5 @@ export const SUPPORTED_MODELS = [
   { id: 'gemini-3-flash', owned_by: 'google' },
   { id: 'gemini-3-pro', owned_by: 'google' },
   { id: 'claude-sonnet-4-5', owned_by: 'anthropic' },
-  { id: 'claude-opus-4', owned_by: 'anthropic' },
+  { id: 'claude-opus-4-5', owned_by: 'anthropic' },
 ] as const;
