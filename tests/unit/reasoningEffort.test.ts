@@ -32,26 +32,17 @@ Deno.test('Deve preservar sufixo existente em modelos Gemini 3 Pro', () => {
   assertEquals(normalizeModelForAntigravity('gemini-3-pro-low', 'high'), 'gemini-3-pro-low');
 });
 
-Deno.test('Deve normalizar modelos Gemini 3 Flash sem sufixo', () => {
+Deno.test('Deve não adicionar sufixo em modelos Gemini 3 Flash', () => {
     // Given & When & Then
-    assertEquals(normalizeModelForAntigravity('gemini-3-flash'), 'gemini-3-flash-medium'); // default
-    assertEquals(normalizeModelForAntigravity('GEMINI-3-FLASH'), 'GEMINI-3-FLASH-medium');
+    assertEquals(normalizeModelForAntigravity('gemini-3-flash'), 'gemini-3-flash');
+    assertEquals(normalizeModelForAntigravity('GEMINI-3-FLASH'), 'GEMINI-3-FLASH');
+    assertEquals(normalizeModelForAntigravity('gemini-3-flash', 'low'), 'gemini-3-flash');
 });
 
-Deno.test('Deve normalizar modelos Gemini 3 Flash com reasoning_effort', () => {
-  // Given & When & Then
-  assertEquals(normalizeModelForAntigravity('gemini-3-flash', 'low'), 'gemini-3-flash-low');
-  assertEquals(normalizeModelForAntigravity('gemini-3-flash', 'high'), 'gemini-3-flash-high');
-  assertEquals(normalizeModelForAntigravity('gemini-3-flash', 'minimal'), 'gemini-3-flash-minimal');
-});
-
-Deno.test('Deve preservar sufixo existente em modelos Gemini 3 Flash', () => {
+Deno.test('Deve preservar sufixo existente em modelos Gemini 3 Flash (se o usuário enviar manualmente)', () => {
   // Given & When & Then
   assertEquals(normalizeModelForAntigravity('gemini-3-flash-low'), 'gemini-3-flash-low');
   assertEquals(normalizeModelForAntigravity('gemini-3-flash-medium'), 'gemini-3-flash-medium');
-  assertEquals(normalizeModelForAntigravity('gemini-3-flash-high'), 'gemini-3-flash-high');
-  assertEquals(normalizeModelForAntigravity('gemini-3-flash-minimal'), 'gemini-3-flash-minimal');
-  assertEquals(normalizeModelForAntigravity('gemini-3-flash-low', 'high'), 'gemini-3-flash-low');
 });
 
 

@@ -57,10 +57,6 @@ export function normalizeModelForAntigravity(
     return `${model}-${mapReasoningEffortToGemini3Pro(reasoningEffort)}`;
   }
 
-  if (lower.startsWith('gemini-3-flash') && !lower.match(/-(minimal|low|medium|high)$/)) {
-    return `${model}-${mapReasoningEffortToGemini3Flash(reasoningEffort)}`;
-  }
-
   return model;
 }
 
@@ -161,7 +157,11 @@ export async function chatCompletions(c: Context): Promise<Response> {
       },
     };
 
-    const response = await makeAntigravityRequest(payload as unknown as Record<string, unknown>, accessToken);
+    const response = await makeAntigravityRequest(
+      payload as unknown as Record<string, unknown>,
+      accessToken,
+      { refreshToken }
+    );
 
     if (!response.body) {
       return c.json({ error: { message: 'No response body from Antigravity' } }, 502);
