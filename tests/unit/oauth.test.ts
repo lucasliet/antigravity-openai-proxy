@@ -5,7 +5,9 @@ const VALID_REFRESH_TOKEN = 'test_refresh_token_valid';
 const EXPIRED_REFRESH_TOKEN = 'test_refresh_token_expired';
 const INVALID_REFRESH_TOKEN = 'test_refresh_token_invalid';
 
-async function mockTokenFetch(refreshToken: string, response: {
+const originalFetch = globalThis.fetch;
+
+async function mockTokenFetch(response: {
   ok: boolean;
   status: number;
   data?: unknown;
@@ -20,7 +22,7 @@ async function mockTokenFetch(refreshToken: string, response: {
 }
 
 function restoreFetch() {
-  globalThis.fetch = fetch;
+  globalThis.fetch = originalFetch;
 }
 
 Deno.test('Deve retornar token em cache hit', async () => {
@@ -31,7 +33,7 @@ Deno.test('Deve retornar token em cache hit', async () => {
     expires_in: 3600,
   };
 
-  await mockTokenFetch(VALID_REFRESH_TOKEN, {
+  await mockTokenFetch({
     ok: true,
     status: 200,
     data: mockData,
@@ -58,7 +60,7 @@ Deno.test('Deve fazer refresh quando token expira', async () => {
     expires_in: 3600,
   };
 
-  await mockTokenFetch(EXPIRED_REFRESH_TOKEN, {
+  await mockTokenFetch({
     ok: true,
     status: 200,
     data: mockData,
@@ -78,7 +80,7 @@ Deno.test('Deve fazer refresh quando token expira', async () => {
 Deno.test('Deve lançar erro quando token é inválido', async () => {
   clearTokenCache();
 
-  await mockTokenFetch(INVALID_REFRESH_TOKEN, {
+  await mockTokenFetch({
     ok: false,
     status: 401,
     data: { error: 'invalid_grant' },

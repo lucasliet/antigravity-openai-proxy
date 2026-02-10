@@ -39,7 +39,6 @@ export async function makeAntigravityRequest(
   options: RequestOptions = {},
 ): Promise<Response> {
   const style = options.headerStyle ?? "antigravity";
-  const capacityRetryCount = options.capacityRetryCount ?? 0;
   const model = payload.model as string;
 
   const endpoints = style === "gemini-cli"
@@ -48,97 +47,96 @@ export async function makeAntigravityRequest(
 
   for (let i = 0; i < endpoints.length; i++) {
     const endpoint = endpoints[i];
-    const url = `${endpoint}/v1internal:streamGenerateContent?alt=sse`;
+    let capacityRetryCount = 0;
 
-    const styleHeaders = getRandomizedHeaders(style);
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'text/event-stream',
-      'Authorization': `Bearer ${accessToken}`,
-      'anthropic-beta': 'interleaved-thinking-2025-05-14',
-      ...styleHeaders,
-    };
+    while (capacityRetryCount < 5) {
+      const url = `${endpoint}/v1internal:streamGenerateContent?alt=sse`;
 
-    if (style === "antigravity" && options.refreshToken) {
-      const fingerprint = getFingerprintHeaders(options.refreshToken);
-      headers["X-Goog-QuotaUser"] = fingerprint["X-Goog-QuotaUser"];
-      headers["X-Client-Device-Id"] = fingerprint["X-Client-Device-Id"];
-    }
+      const styleHeaders = getRandomizedHeaders(style);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        'Authorization': `Bearer ${accessToken}`,
+        'anthropic-beta': 'interleaved-thinking-2025-05-14',
+        ...styleHeaders,
+      };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    });
+      if (style === "antigravity" && options.refreshToken) {
+        const fingerprint = await getFingerprintHeaders(options.refreshToken);
+        headers["X-Goog-QuotaUser"] = fingerprint["X-Goog-QuotaUser"];
+        headers["X-Client-Device-Id"] = fingerprint["X-Client-Device-Id"];
+      }
 
-    if (response.ok) {
-      return response;
-    }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
 
-    if (response.status === 429 || response.status === 503) {
-      const reason = await parseErrorReason(response);
+      if (response.ok) {
+        return response;
+      }
 
-      if (reason === "MODEL_CAPACITY_EXHAUSTED" || reason === "SERVER_ERROR") {
-        if (capacityRetryCount < 4) {
-          const baseDelayMs = 1000;
-          const maxDelayMs = 8000;
-          const exponentialDelay = Math.min(baseDelayMs * Math.pow(2, capacityRetryCount), maxDelayMs);
-          const jitter = Math.floor(Math.random() * 500);
-          const waitMs = exponentialDelay + jitter;
+      if (response.status === 429 || response.status === 503) {
+        const reason = await parseErrorReason(response);
 
-          console.warn(`[Client] Server busy (${reason}) on ${endpoint}, exponential backoff ${waitMs}ms (attempt ${capacityRetryCount + 1})`);
-          await response.body?.cancel();
-          await sleep(waitMs);
+        if (reason === "MODEL_CAPACITY_EXHAUSTED" || reason === "SERVER_ERROR") {
+          if (capacityRetryCount < 4) {
+            const baseDelayMs = 1000;
+            const maxDelayMs = 8000;
+            const exponentialDelay = Math.min(baseDelayMs * Math.pow(2, capacityRetryCount), maxDelayMs);
+            const jitter = Math.floor(Math.random() * 500);
+            const waitMs = exponentialDelay + jitter;
 
-          return makeAntigravityRequest(payload, accessToken, {
-            ...options,
-            capacityRetryCount: capacityRetryCount + 1,
-          });
+            console.warn(`[Client] Server busy (${reason}) on ${endpoint}, exponential backoff ${waitMs}ms (attempt ${capacityRetryCount + 1})`);
+            await response.body?.cancel();
+            await sleep(waitMs);
+
+            capacityRetryCount++;
+            continue;
+          }
         }
-      }
 
-      if (i < endpoints.length - 1) {
-        console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, trying next...`);
         await response.body?.cancel();
-        continue;
+        break;
       }
 
-      if (style === "antigravity" && !isClaudeModel(model)) {
-        console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, will try Gemini CLI fallback...`);
-        await response.body?.cancel();
-        continue;
-      }
-    }
+      if (response.status === 403) {
+        const errorText = await response.text();
+        if (errorText.includes("lack a Gemini Code Assist license") && i < endpoints.length - 1) {
+          console.warn(`[Client] License error on ${endpoint}, trying next endpoint...`);
+          await response.body?.cancel();
+          break;
+        }
 
-    if (response.status === 403) {
-      const errorText = await response.text();
-      if (errorText.includes("lack a Gemini Code Assist license") && i < endpoints.length - 1) {
-        console.warn(`[Client] License error on ${endpoint}, trying next endpoint...`);
-        continue;
-      }
+        if (style === "antigravity" && !isClaudeModel(model) && i === endpoints.length - 1) {
+          console.warn(`[Client] License error on ${endpoint}, will try Gemini CLI fallback...`);
+          await response.body?.cancel();
+          break;
+        }
 
-      if (style === "antigravity" && !isClaudeModel(model) && i === endpoints.length - 1) {
-        console.warn(`[Client] License error on ${endpoint}, will try Gemini CLI fallback...`);
-        continue;
+        throw new Error(`Antigravity API error (${response.status}): ${errorText}`);
       }
 
-      throw new Error(`Antigravity API error (${response.status}): ${errorText}`);
-    }
+      if (!response.ok) {
+        const errorText = await response.text();
 
-    if (!response.ok) {
-      const errorText = await response.text();
+        if (i < endpoints.length - 1) {
+          console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, trying next...`);
+          await response.body?.cancel();
+          break;
+        }
 
-      if (i < endpoints.length - 1) {
-        console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, trying next...`);
-        continue;
+        if (style === "antigravity" && !isClaudeModel(model)) {
+          console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, will try Gemini CLI fallback...`);
+          await response.body?.cancel();
+          break;
+        }
+
+        throw new Error(`Antigravity API error (${response.status}): ${errorText}`);
       }
 
-      if (style === "antigravity" && !isClaudeModel(model)) {
-        console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, will try Gemini CLI fallback...`);
-        continue;
-      }
-
-      throw new Error(`Antigravity API error (${response.status}): ${errorText}`);
+      break;
     }
   }
 
@@ -151,7 +149,6 @@ export async function makeAntigravityRequest(
     return makeAntigravityRequest(cliPayload, accessToken, {
       ...options,
       headerStyle: "gemini-cli",
-      capacityRetryCount: 0,
     });
   }
 

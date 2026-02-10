@@ -60,6 +60,7 @@ Deno.test('Deve mapear reasoning_effort para Gemini 3 Pro corretamente', () => {
     { input: 'low' as const, expected: 'low' },
     { input: 'medium' as const, expected: 'low' },
     { input: 'high' as const, expected: 'high' },
+    { input: 'minimal' as const, expected: 'low' },
     { input: undefined, expected: 'low' },
   ];
 
@@ -93,6 +94,7 @@ Deno.test('Deve mapear reasoning_effort para token budget corretamente', () => {
     { input: 'low' as const, expected: 8192 },
     { input: 'medium' as const, expected: 16384 },
     { input: 'high' as const, expected: 32768 },
+    { input: 'minimal' as const, expected: 8192 },
     { input: undefined, expected: 16000 },
   ];
 

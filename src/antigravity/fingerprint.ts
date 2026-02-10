@@ -5,11 +5,16 @@ export interface FingerprintHeaders {
 
 const fingerprintCache = new Map<string, FingerprintHeaders>();
 
-export function getFingerprintHeaders(refreshToken: string): FingerprintHeaders {
+/**
+ * Generates fingerprint headers for a refresh token using SHA-256 hashing.
+ * @param refreshToken - The refresh token to generate headers for.
+ * @returns Fingerprint headers with quota user and device ID.
+ */
+export async function getFingerprintHeaders(refreshToken: string): Promise<FingerprintHeaders> {
   const cached = fingerprintCache.get(refreshToken);
   if (cached) return cached;
 
-  const hash = hashString(refreshToken);
+  const hash = await hashString(refreshToken);
   const quotaUser = `device-${hash}`;
   const deviceId = hash.padEnd(32, '0');
 
@@ -37,12 +42,15 @@ export function clearFingerprintCache(): void {
   fingerprintCache.clear();
 }
 
-function hashString(input: string): string {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(8, '0');
+/**
+ * Generates a SHA-256 hash of the input string.
+ * @param input - The string to hash.
+ * @returns A 16-character hexadecimal string.
+ */
+async function hashString(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
 }
