@@ -256,6 +256,8 @@ export async function getProjectId(refreshToken: string): Promise<string | undef
           console.log(`[OAuth] Discovered project for token: ${projectId}`);
           return projectId;
         }
+      } else {
+        await res.body?.cancel();
       }
     } catch (e) {
       console.warn(`[OAuth] Discovery failed on ${endpoint}:`, e);
