@@ -192,14 +192,14 @@ O proxy suporta o parâmetro `reasoning_effort` do OpenAI para controlar o níve
   - `minimal` → `gemini-3-pro-low`
 
 #### Gemini 3 Flash
-- Usa **sufixo no nome do modelo**: `gemini-3-flash-{level}`
+- Usa **`thinkingLevel` no `generationConfig`** (sem sufixo no nome do modelo)
 - Níveis suportados: `minimal`, `low`, `medium`, `high`
-- Mapeamento:
-  - `minimal` → `gemini-3-flash-minimal`
-  - `low` → `gemini-3-flash-low`
-  - `medium` → `gemini-3-flash-medium`
-  - `high` → `gemini-3-flash-high`
-  - `undefined` → `gemini-3-flash-medium` (default)
+- Mapeamento (aplicado via `generationConfig.thinkingConfig.thinkingLevel`):
+  - `minimal` → `thinkingLevel: "minimal"`
+  - `low` → `thinkingLevel: "low"`
+  - `medium` → `thinkingLevel: "medium"`
+  - `high` → `thinkingLevel: "high"`
+  - `undefined` → `thinkingLevel: "medium"` (default)
 
 #### Claude Thinking (Opus 4)
 - Usa **budget numérico de tokens**: `thinking.budgetTokens`

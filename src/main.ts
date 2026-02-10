@@ -7,14 +7,19 @@ import { getCacheMetrics } from './antigravity/oauth.ts';
 
 export const app = new Hono();
 
+const SERVER_START_TIME = Date.now();
+
 app.get('/', (c: Context) => c.json({ status: 'ok', service: 'antigravity-openai-proxy' }));
 
 app.get('/metrics', (c: Context) => {
   const metrics = getCacheMetrics();
+  const uptimeMs = Date.now() - SERVER_START_TIME;
+  const uptimeSeconds = Math.floor(uptimeMs / 1000);
+
   return c.json({
     oauth: {
       cache: metrics,
-      uptime: Deno.env.get('UPTIME') || 'unknown',
+      uptimeSeconds,
     },
   });
 });

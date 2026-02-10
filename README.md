@@ -107,8 +107,8 @@ const response = await client.chat.completions.create({
 
 | Modelo | `low` | `medium` | `high` | `minimal` | Default |
 |--------|-------|----------|--------|-----------|---------|
-| **Gemini 3 Pro** | `-low` | `-low` | `-high` | N/A | `-low` |
-| **Gemini 3 Flash** | `-low` | `-medium` | `-high` | `-minimal` | `-medium` |
+| **Gemini 3 Pro** | `-low` | `-low` | `-high` | `-low` | `-low` |
+| **Gemini 3 Flash** | `thinkingLevel: low` | `thinkingLevel: medium` | `thinkingLevel: high` | `thinkingLevel: minimal` | `thinkingLevel: medium` |
 | **Claude Sonnet 4-5** | 8K tokens | 16K tokens | 32K tokens | 8K tokens | 16K tokens |
 | **Claude Opus 4-5** | 8K tokens | 16K tokens | 32K tokens | 8K tokens | 16K tokens |
 
