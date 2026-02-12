@@ -103,7 +103,7 @@ export async function chatCompletions(c: Context): Promise<Response> {
     if (body.top_p !== undefined) generationConfig.topP = body.top_p;
     if (body.stop) generationConfig.stopSequences = Array.isArray(body.stop) ? body.stop : [body.stop];
 
-    if (thinking && !claude) {
+    if (thinking) {
       const lowerModel = model.toLowerCase();
       const isGemini3 = lowerModel.includes('gemini-3');
 
@@ -124,6 +124,16 @@ export async function chatCompletions(c: Context): Promise<Response> {
           thinkingLevel,
           includeThoughts: true,
         };
+      } else if (claude) {
+        const thinkingBudget = mapReasoningEffortToTokenBudget(body.reasoning_effort);
+        generationConfig.thinkingConfig = {
+          include_thoughts: true,
+          thinking_budget: thinkingBudget,
+        };
+        const CLAUDE_THINKING_MAX_OUTPUT_TOKENS = 64_000;
+        if (!generationConfig.maxOutputTokens || (generationConfig.maxOutputTokens as number) <= thinkingBudget) {
+          generationConfig.maxOutputTokens = CLAUDE_THINKING_MAX_OUTPUT_TOKENS;
+        }
       } else {
         const thinkingBudget = mapReasoningEffortToTokenBudget(body.reasoning_effort);
         generationConfig.thinkingConfig = {
@@ -140,25 +150,27 @@ export async function chatCompletions(c: Context): Promise<Response> {
 
     console.log(`[ChatCompletions] Model mapping: ${model} -> ${antigravityModel} (reasoning_effort: ${body.reasoning_effort || 'undefined'})`);
 
+    const toolConfig = claude && tools
+      ? { functionCallingConfig: { mode: "VALIDATED" } }
+      : undefined;
+
+    const sessionId = `session-${crypto.randomUUID()}`;
+
     const payload: AntigravityRequestPayload = {
       project: projectId,
       model: antigravityModel,
       userAgent: 'antigravity',
-      requestId: `req-${crypto.randomUUID()}`,
+      requestId: `agent-${crypto.randomUUID()}`,
       requestType: 'agent',
       request: {
         contents,
         ...(tools ? { tools } : {}),
+        ...(toolConfig ? { toolConfig } : {}),
         ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {}),
-        ...(thinking && claude ? {
-          thinking: {
-            type: 'enabled' as const,
-            budgetTokens: mapReasoningEffortToTokenBudget(body.reasoning_effort),
-          },
-        } : {}),
         ...(systemInstruction ? {
           systemInstruction: { role: 'user' as const, parts: [{ text: systemInstruction }] },
         } : {}),
+        sessionId,
       },
     };
 

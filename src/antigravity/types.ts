@@ -92,9 +92,9 @@ export interface OpenAITool {
 }
 
 export const ANTIGRAVITY_ENDPOINTS = [
-  'https://daily-cloudcode-pa.sandbox.googleapis.com',
-  'https://autopush-cloudcode-pa.sandbox.googleapis.com',
   'https://cloudcode-pa.googleapis.com',
+  'https://autopush-cloudcode-pa.sandbox.googleapis.com',
+  'https://daily-cloudcode-pa.sandbox.googleapis.com',
 ] as const;
 
 export const SKIP_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
@@ -191,11 +191,19 @@ export function getRandomizedHeaders(style: HeaderStyle): Record<string, string>
 }
 
 export function resolveModelForHeaderStyle(model: string, style: HeaderStyle): string {
-  if (style === "antigravity") return model;
+  const lower = model.toLowerCase();
+  const isGemini3 = lower.includes("gemini-3");
+
+  if (style === "antigravity") {
+    if (isGemini3 && model.endsWith("-preview")) {
+      return model.replace(/-preview$/i, "");
+    }
+    return model;
+  }
 
   const withoutTier = model.replace(/-(low|medium|high|minimal)$/i, "");
 
-  if (withoutTier.toLowerCase().includes("gemini-3") && !withoutTier.endsWith("-preview")) {
+  if (isGemini3 && !withoutTier.endsWith("-preview")) {
     return `${withoutTier}-preview`;
   }
 
@@ -207,6 +215,9 @@ export const ANTIGRAVITY_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 export const SUPPORTED_MODELS = [
   { id: 'gemini-3-flash', owned_by: 'google' },
   { id: 'gemini-3-pro', owned_by: 'google' },
+  { id: 'gemini-2.5-flash', owned_by: 'google' },
+  { id: 'gemini-2.5-pro', owned_by: 'google' },
   { id: 'claude-sonnet-4-5', owned_by: 'anthropic' },
-  { id: 'claude-opus-4-5', owned_by: 'anthropic' },
+  { id: 'claude-sonnet-4-5-thinking', owned_by: 'anthropic' },
+  { id: 'claude-opus-4-6-thinking', owned_by: 'anthropic' },
 ] as const;

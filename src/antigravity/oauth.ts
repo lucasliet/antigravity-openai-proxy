@@ -215,7 +215,9 @@ export function resetCleanupTimer(): void {
 
 export { getCacheMetrics, stopCleanupTimer };
 
-export async function getProjectId(refreshToken: string): Promise<string | undefined> {
+export async function getProjectId(refreshToken: string): Promise<string> {
+  const FALLBACK_PROJECT_ID = 'rising-fact-p41fc';
+  
   const cached = tokenCache.get(refreshToken);
   if (cached?.projectId) {
     cached.lastAccessedAt = Date.now();
@@ -264,5 +266,11 @@ export async function getProjectId(refreshToken: string): Promise<string | undef
     }
   }
 
-  return undefined;
+  console.log(`[OAuth] No project discovered, using fallback: ${FALLBACK_PROJECT_ID}`);
+  const entry = tokenCache.get(refreshToken);
+  if (entry) {
+    entry.projectId = FALLBACK_PROJECT_ID;
+    entry.lastAccessedAt = Date.now();
+  }
+  return FALLBACK_PROJECT_ID;
 }
