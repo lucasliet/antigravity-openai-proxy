@@ -1,6 +1,7 @@
 import { assertEquals, assertExists } from 'asserts';
 import { stub } from "mock";
 import { app } from '../../src/main.ts';
+import { resetCleanupTimer } from '../../src/antigravity/oauth.ts';
 
 // Mock env vars
 Deno.env.set("ANTIGRAVITY_REFRESH_TOKEN", "mock-refresh-token");
@@ -88,5 +89,6 @@ Deno.test('@DisplayName("Criação de chat completion sem streaming")', async ()
   } finally {
     fetchStub.restore();
     await server.shutdown();
+    resetCleanupTimer();
   }
 });

@@ -86,7 +86,31 @@ O proxy mapeia automaticamente os modelos para os endpoints corretos do Antigrav
 - `gemini-3-flash`
 - `gemini-3-pro`
 - `claude-sonnet-4-5`
-- `claude-opus-4`
+- `claude-opus-4-5`
+
+### Controlando o Nível de Raciocínio (`reasoning_effort`)
+
+O proxy suporta o parâmetro `reasoning_effort` do OpenAI para controlar a intensidade do raciocínio em modelos thinking:
+
+**Valores suportados:** `low`, `medium`, `high`, `minimal` (Gemini 3 Flash apenas)
+
+**Exemplo:**
+```typescript
+const response = await client.chat.completions.create({
+  model: "gemini-3-pro",
+  messages: [{ role: "user", content: "Explique a relatividade" }],
+  reasoning_effort: "high"  // Usa gemini-3-pro-high
+});
+```
+
+**Mapeamento por modelo:**
+
+| Modelo | `low` | `medium` | `high` | `minimal` | Default |
+|--------|-------|----------|--------|-----------|---------|
+| **Gemini 3 Pro** | `-low` | `-low` | `-high` | `-low` | `-low` |
+| **Gemini 3 Flash** | `thinkingLevel: low` | `thinkingLevel: medium` | `thinkingLevel: high` | `thinkingLevel: minimal` | `thinkingLevel: medium` |
+| **Claude Sonnet 4-5** | 8K tokens | 16K tokens | 32K tokens | 8K tokens | 16K tokens |
+| **Claude Opus 4-5** | 8K tokens | 16K tokens | 32K tokens | 8K tokens | 16K tokens |
 
 ---
 

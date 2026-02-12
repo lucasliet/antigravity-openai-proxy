@@ -4,11 +4,61 @@ import {
   DEFAULT_THINKING_BUDGET,
   isClaudeModel,
   isThinkingCapableModel,
+  REASONING_EFFORT_BUDGETS,
 } from '../antigravity/types.ts';
 import { toGeminiFormat, toGeminiTools } from '../antigravity/transformer.ts';
 import { makeAntigravityRequest } from '../antigravity/client.ts';
 import { getAccessToken, getProjectId } from '../antigravity/oauth.ts';
 import { transformGeminiToOpenAIStream } from '../antigravity/streamTransformer.ts';
+
+export function mapReasoningEffortToGemini3Pro(
+  reasoning_effort?: 'low' | 'medium' | 'high' | 'minimal',
+): string {
+  switch (reasoning_effort) {
+    case 'low': return 'low';
+    case 'medium': return 'low';
+    case 'high': return 'high';
+    case 'minimal': return 'low';
+    default: return 'low';
+  }
+}
+
+export function mapReasoningEffortToGemini3Flash(
+  reasoning_effort?: 'low' | 'medium' | 'high' | 'minimal',
+): string {
+  switch (reasoning_effort) {
+    case 'minimal': return 'minimal';
+    case 'low': return 'low';
+    case 'medium': return 'medium';
+    case 'high': return 'high';
+    default: return 'medium';
+  }
+}
+
+export function mapReasoningEffortToTokenBudget(
+  reasoning_effort?: 'low' | 'medium' | 'high' | 'minimal',
+): number {
+  switch (reasoning_effort) {
+    case 'low': return REASONING_EFFORT_BUDGETS.low;
+    case 'medium': return REASONING_EFFORT_BUDGETS.medium;
+    case 'high': return REASONING_EFFORT_BUDGETS.high;
+    case 'minimal': return REASONING_EFFORT_BUDGETS.low;
+    default: return DEFAULT_THINKING_BUDGET;
+  }
+}
+
+export function normalizeModelForAntigravity(
+  model: string,
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'minimal'
+): string {
+  const lower = model.toLowerCase();
+
+  if (lower.startsWith('gemini-3-pro') && !lower.match(/-(low|high|medium|minimal)$/)) {
+    return `${model}-${mapReasoningEffortToGemini3Pro(reasoningEffort)}`;
+  }
+
+  return model;
+}
 
 /**
  * Handles OpenAI-compatible chat completion requests.
@@ -54,18 +104,45 @@ export async function chatCompletions(c: Context): Promise<Response> {
     if (body.stop) generationConfig.stopSequences = Array.isArray(body.stop) ? body.stop : [body.stop];
 
     if (thinking && !claude) {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: DEFAULT_THINKING_BUDGET,
-        includeThoughts: true,
-      };
+      const lowerModel = model.toLowerCase();
+      const isGemini3 = lowerModel.includes('gemini-3');
+
+      if (isGemini3) {
+        const isGemini3Pro = lowerModel.includes('gemini-3-pro');
+        const isGemini3Flash = lowerModel.includes('gemini-3-flash');
+
+        let thinkingLevel: string;
+        if (isGemini3Pro) {
+          thinkingLevel = mapReasoningEffortToGemini3Pro(body.reasoning_effort);
+        } else if (isGemini3Flash) {
+          thinkingLevel = mapReasoningEffortToGemini3Flash(body.reasoning_effort);
+        } else {
+          throw new Error(`Unsupported Gemini 3 model: ${model}`);
+        }
+
+        generationConfig.thinkingConfig = {
+          thinkingLevel,
+          includeThoughts: true,
+        };
+      } else {
+        const thinkingBudget = mapReasoningEffortToTokenBudget(body.reasoning_effort);
+        generationConfig.thinkingConfig = {
+          thinkingBudget,
+          includeThoughts: true,
+        };
+      }
     }
 
     const projectId = await getProjectId(refreshToken);
     const accessToken = await getAccessToken(refreshToken);
 
+    const antigravityModel = normalizeModelForAntigravity(model, body.reasoning_effort);
+
+    console.log(`[ChatCompletions] Model mapping: ${model} -> ${antigravityModel} (reasoning_effort: ${body.reasoning_effort || 'undefined'})`);
+
     const payload: AntigravityRequestPayload = {
       project: projectId,
-      model,
+      model: antigravityModel,
       userAgent: 'antigravity',
       requestId: `req-${crypto.randomUUID()}`,
       requestType: 'agent',
@@ -76,7 +153,7 @@ export async function chatCompletions(c: Context): Promise<Response> {
         ...(thinking && claude ? {
           thinking: {
             type: 'enabled' as const,
-            budgetTokens: DEFAULT_THINKING_BUDGET,
+            budgetTokens: mapReasoningEffortToTokenBudget(body.reasoning_effort),
           },
         } : {}),
         ...(systemInstruction ? {
@@ -85,7 +162,11 @@ export async function chatCompletions(c: Context): Promise<Response> {
       },
     };
 
-    const response = await makeAntigravityRequest(payload as unknown as Record<string, unknown>, accessToken);
+    const response = await makeAntigravityRequest(
+      payload as unknown as Record<string, unknown>,
+      accessToken,
+      { refreshToken }
+    );
 
     if (!response.body) {
       return c.json({ error: { message: 'No response body from Antigravity' } }, 502);

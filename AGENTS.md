@@ -122,6 +122,140 @@ Execute `deno task antigravity-login` para obter um Google Refresh Token atravé
 - O refresh token obtido pode ser usado indefinidamente (não expira)
 - Mantenha o refresh token seguro, pois dá acesso à sua conta Google Cloud
 
+## 🔄 OAuth Token Cache
+
+### Visão Geral
+
+O sistema de cache de tokens OAuth em `src/antigravity/oauth.ts` implementa um cache multi-usuário com as seguintes características:
+
+- **Multi-usuário**: Cada `refreshToken` possui sua própria entrada no cache
+- **TTL automático**: Tokens expiram após `expires_in - 60s` (buffer de segurança)
+- **LRU eviction**: Cache com limite de 1000 entradas, removendo as menos usadas recentemente
+- **Cleanup periódico**: Entradas expiradas são removidas a cada 5 minutos
+- **Race condition protection**: Múltiplas requisições simultâneas do mesmo token compartilham a mesma promise de refresh
+
+### Métricas
+
+O endpoint `/metrics` expõe as seguintes métricas do cache:
+
+```json
+{
+  "oauth": {
+    "cache": {
+      "hits": 100,
+      "misses": 5,
+      "refreshes": 3,
+      "evictedByCleanup": 10,
+      "evictedByLRU": 2
+    }
+  }
+}
+```
+
+- **hits**: Número de vezes que um token válido foi retornado do cache
+- **misses**: Número de vezes que um token expirado ou ausente precisou de refresh
+- **refreshes**: Número total de operações de refresh realizadas
+- **evictedByCleanup**: Número de entradas removidas por expiração
+- **evictedByLRU**: Número de entradas removidas por limite de cache
+
+### Tratamento de Erros
+
+O sistema diferencia entre tipos de erro durante o refresh:
+
+- **Invalid token (400, 401)**: Remove entrada do cache e lança erro
+- **Rate limit (429)**: Lança erro sem remover entrada (para retry posterior)
+- **Network error**: Lança erro sem remover entrada (para retry posterior)
+
+### Notas de Implementação
+
+- O cleanup timer é iniciado automaticamente na primeira chamada de `getAccessToken()`
+- Use `clearTokenCache()` para limpar todo o cache (útil em testes)
+- Use `stopCleanupTimer()` para parar o timer de cleanup
+- Cada entrada do cache inclui `lastAccessedAt` para implementação do LRU
+
+## 🧠 Suporte ao `reasoning_effort` (OpenAI)
+
+### Visão Geral
+
+O proxy suporta o parâmetro `reasoning_effort` do OpenAI para controlar o nível de raciocínio em modelos thinking (o1, o1-mini, Gemini 3, Claude).
+
+### Mapeamento por Modelo
+
+#### Gemini 3 Pro
+- Usa **sufixo no nome do modelo**: `gemini-3-pro-{level}`
+- Níveis suportados: `low`, `high`
+- Mapeamento:
+  - `low` → `gemini-3-pro-low`
+  - `medium` → `gemini-3-pro-low` (limitação do modelo)
+  - `high` → `gemini-3-pro-high`
+  - `undefined` → `gemini-3-pro-low` (default)
+  - `minimal` → `gemini-3-pro-low`
+
+#### Gemini 3 Flash
+- Usa **`thinkingLevel` no `generationConfig`** (sem sufixo no nome do modelo)
+- Níveis suportados: `minimal`, `low`, `medium`, `high`
+- Mapeamento (aplicado via `generationConfig.thinkingConfig.thinkingLevel`):
+  - `minimal` → `thinkingLevel: "minimal"`
+  - `low` → `thinkingLevel: "low"`
+  - `medium` → `thinkingLevel: "medium"`
+  - `high` → `thinkingLevel: "high"`
+  - `undefined` → `thinkingLevel: "medium"` (default)
+
+#### Claude Thinking (Opus 4)
+- Usa **budget numérico de tokens**: `thinking.budgetTokens`
+- Mapeamento:
+  - `low` → 8192 tokens
+  - `medium` → 16384 tokens
+  - `high` → 32768 tokens
+  - `minimal` → 8192 tokens
+  - `undefined` → 16000 tokens (DEFAULT_THINKING_BUDGET)
+
+#### Gemini 2.5 (Pro/Flash)
+- Usa **budget numérico de tokens**: `generationConfig.thinkingConfig.thinkingBudget`
+- Mesmo mapeamento do Claude Thinking
+
+### Implementação
+
+**Arquivos:**
+- `src/antigravity/types.ts`: Define `OpenAIChatRequest.reasoning_effort` e constantes `REASONING_EFFORT_BUDGETS`
+- `src/routes/chatCompletions.ts`: Funções de mapeamento e lógica de aplicação
+
+**Funções de Mapeamento:**
+- `mapReasoningEffortToGemini3Pro()`: Mapeia para string de sufixo
+- `mapReasoningEffortToGemini3Flash()`: Mapeia para string de sufixo
+- `mapReasoningEffortToTokenBudget()`: Mapeia para número de tokens
+- `normalizeModelForAntigravity()`: Adiciona sufixo ao nome do modelo para Gemini 3
+
+### Exemplo de Uso
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Authorization: Bearer $ANTIGRAVITY_REFRESH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-3-pro",
+    "messages": [{"role": "user", "content": "Explique a relatividade"}],
+    "reasoning_effort": "high"
+  }'
+```
+
+Resultado interno: `gemini-3-pro-high` será enviado para a API do Antigravity.
+
+### Testes
+
+Execute a bateria completa de testes:
+```bash
+deno task test
+```
+
+### Notas Importantes
+
+- Para **Gemini 3 Pro**, o `reasoning_effort` é aplicado via **sufixo no nome do modelo** (`-low`, `-high`) + `thinkingLevel` no `generationConfig`
+- Para **Gemini 3 Flash**, o `reasoning_effort` é aplicado **apenas** via `thinkingLevel` no `generationConfig` (sem sufixo no modelo)
+- Para **Gemini 2.5** e **Claude**, o `reasoning_effort` controla o `thinkingBudget` numérico no `generationConfig`
+- A implementação é **backward compatible**: clientes sem o parâmetro funcionam normalmente
+- SDKs OpenAI podem enviar o parâmetro nativamente sem modificações
+
 ## 📁 Project Structure
 
 - `src/main.ts`: Application entry point.

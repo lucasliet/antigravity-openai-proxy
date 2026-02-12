@@ -3,7 +3,7 @@ import { isClaudeModel, isThinkingCapableModel } from '../../src/antigravity/typ
 
 Deno.test('@DisplayName("Detecção de modelos Claude")', () => {
   // Given
-  const claudeModels = ['claude-3-5-sonnet', 'claude-opus-4', 'CLAUDE-SONNET'];
+  const claudeModels = ['claude-3-5-sonnet', 'claude-opus-4-5', 'CLAUDE-SONNET'];
   const otherModels = ['gemini-3-flash', 'gpt-4o'];
 
   // When & Then
@@ -18,7 +18,7 @@ Deno.test('@DisplayName("Detecção de modelos Claude")', () => {
 
 Deno.test('@DisplayName("Detecção de modelos capazes de pensamento (thinking)")', () => {
   // Given
-  const thinkingModels = ['gemini-3-flash', 'claude-opus-4', 'gemini-3-thinking'];
+  const thinkingModels = ['gemini-3-flash', 'claude-opus-4-5', 'gemini-3-thinking'];
   const normalModels = ['gemini-1.5-flash', 'gpt-4o'];
 
   // When & Then
