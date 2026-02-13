@@ -91,9 +91,10 @@ export async function chatCompletions(c: Context): Promise<Response> {
   const thinking = isThinkingCapableModel(model);
 
   try {
-    const { systemInstruction, contents } = toGeminiFormat(body.messages);
+    const hasTools = body.tools && body.tools.length > 0;
+    const { systemInstruction, contents } = toGeminiFormat(body.messages, model, hasTools);
 
-    const tools = body.tools && body.tools.length > 0
+    const tools = (body.tools && body.tools.length > 0)
       ? toGeminiTools(body.tools, model)
       : undefined;
 
@@ -147,8 +148,9 @@ export async function chatCompletions(c: Context): Promise<Response> {
     const accessToken = await getAccessToken(refreshToken);
 
     const antigravityModel = normalizeModelForAntigravity(model, body.reasoning_effort);
+    const requestType = 'agent';
 
-    console.log(`[ChatCompletions] Model mapping: ${model} -> ${antigravityModel} (reasoning_effort: ${body.reasoning_effort || 'undefined'})`);
+    console.log(`[ChatCompletions] Model mapping: ${model} -> ${antigravityModel} (reasoning_effort: ${body.reasoning_effort || 'undefined'}, requestType: ${requestType})`);
 
     const toolConfig = claude && tools
       ? { functionCallingConfig: { mode: "VALIDATED" } }
@@ -161,7 +163,7 @@ export async function chatCompletions(c: Context): Promise<Response> {
       model: antigravityModel,
       userAgent: 'antigravity',
       requestId: `agent-${crypto.randomUUID()}`,
-      requestType: 'agent',
+      requestType,
       request: {
         contents,
         ...(tools ? { tools } : {}),
@@ -177,7 +179,10 @@ export async function chatCompletions(c: Context): Promise<Response> {
     const response = await makeAntigravityRequest(
       payload as unknown as Record<string, unknown>,
       accessToken,
-      { refreshToken }
+      { 
+        refreshToken,
+        headerStyle: claude ? "antigravity" : "gemini-cli"
+      }
     );
 
     if (!response.body) {

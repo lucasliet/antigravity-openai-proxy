@@ -1,4 +1,7 @@
-import { ANTIGRAVITY_ENDPOINTS } from './types.ts';
+import { 
+  ANTIGRAVITY_ENDPOINTS,
+  type LoadCodeAssistPayload,
+} from './types.ts';
 import { ENV } from '../util/env.ts';
 import { evictFingerprint, clearFingerprintCache } from './fingerprint.ts';
 
@@ -22,6 +25,7 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 const tokenCache = new Map<string, TokenEntry>();
 const refreshPromises = new Map<string, Promise<string>>();
+const projectIdPromises = new Map<string, Promise<string>>();
 const cacheMetrics: CacheMetrics = {
   hits: 0,
   misses: 0,
@@ -200,6 +204,7 @@ export async function getAccessToken(refreshToken: string): Promise<string> {
 export function clearTokenCache(): void {
   tokenCache.clear();
   refreshPromises.clear();
+  projectIdPromises.clear();
   clearFingerprintCache();
   cacheMetrics.hits = 0;
   cacheMetrics.misses = 0;
@@ -217,13 +222,33 @@ export { getCacheMetrics, stopCleanupTimer };
 
 export async function getProjectId(refreshToken: string): Promise<string> {
   const FALLBACK_PROJECT_ID = 'rising-fact-p41fc';
-  
+
   const cached = tokenCache.get(refreshToken);
   if (cached?.projectId) {
     cached.lastAccessedAt = Date.now();
     return cached.projectId;
   }
 
+  const existingPromise = projectIdPromises.get(refreshToken);
+  if (existingPromise) {
+    console.log('[OAuth] Waiting for existing projectId promise');
+    return existingPromise;
+  }
+
+  const projectIdPromise = discoverProject(refreshToken, FALLBACK_PROJECT_ID)
+    .finally(() => {
+      projectIdPromises.delete(refreshToken);
+    });
+
+  projectIdPromises.set(refreshToken, projectIdPromise);
+
+  return projectIdPromise;
+}
+
+async function discoverProject(
+  refreshToken: string,
+  fallbackProjectId: string
+): Promise<string> {
   const token = await getAccessToken(refreshToken);
 
   for (const endpoint of ANTIGRAVITY_ENDPOINTS) {
@@ -244,14 +269,22 @@ export async function getProjectId(refreshToken: string): Promise<string> {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as LoadCodeAssistPayload;
         const projectId = typeof data.cloudaicompanionProject === 'string'
           ? data.cloudaicompanionProject
           : data.cloudaicompanionProject?.id;
 
         if (projectId) {
-          const entry = tokenCache.get(refreshToken);
-          if (entry) {
+          let entry = tokenCache.get(refreshToken);
+          if (!entry) {
+            entry = {
+              accessToken: '',
+              expiresAt: 0,
+              projectId,
+              lastAccessedAt: Date.now(),
+            };
+            tokenCache.set(refreshToken, entry);
+          } else {
             entry.projectId = projectId;
             entry.lastAccessedAt = Date.now();
           }
@@ -266,11 +299,19 @@ export async function getProjectId(refreshToken: string): Promise<string> {
     }
   }
 
-  console.log(`[OAuth] No project discovered, using fallback: ${FALLBACK_PROJECT_ID}`);
-  const entry = tokenCache.get(refreshToken);
-  if (entry) {
-    entry.projectId = FALLBACK_PROJECT_ID;
+  console.log(`[OAuth] No project discovered, using fallback: ${fallbackProjectId}`);
+  let entry = tokenCache.get(refreshToken);
+  if (!entry) {
+    entry = {
+      accessToken: '',
+      expiresAt: 0,
+      projectId: fallbackProjectId,
+      lastAccessedAt: Date.now(),
+    };
+    tokenCache.set(refreshToken, entry);
+  } else {
+    entry.projectId = fallbackProjectId;
     entry.lastAccessedAt = Date.now();
   }
-  return FALLBACK_PROJECT_ID;
+  return fallbackProjectId;
 }

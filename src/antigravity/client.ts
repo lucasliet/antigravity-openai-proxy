@@ -6,7 +6,6 @@ import {
   resolveModelForHeaderStyle,
   isClaudeModel,
 } from './types.ts';
-import { getFingerprintHeaders } from './fingerprint.ts';
 
 interface RequestOptions {
   headerStyle?: HeaderStyle;
@@ -17,28 +16,54 @@ interface RequestOptions {
  * Sleeps for the given number of milliseconds.
  * @param ms - Duration in milliseconds.
  */
-async function sleep(ms: number): Promise<void> {
+function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+interface ErrorInfo {
+  reason: string | null;
+  retryAfterMs?: number;
 }
 
 /**
  * Parses the error reason from a response body without consuming the stream.
+ * Also extracts google.rpc.RetryInfo if present to get server-suggested retry delay.
  * @param response - The HTTP response to inspect.
- * @returns The error reason string, or null if unknown.
+ * @returns ErrorInfo containing reason and optional retryAfterMs.
  */
-async function parseErrorReason(response: Response): Promise<string | null> {
+async function parseErrorInfo(response: Response): Promise<ErrorInfo> {
   try {
     const text = await response.clone().text();
+    let reason: string | null = null;
+
     if (text.includes("RESOURCE_EXHAUSTED") || text.includes("MODEL_CAPACITY_EXHAUSTED")) {
-      return "MODEL_CAPACITY_EXHAUSTED";
+      reason = "MODEL_CAPACITY_EXHAUSTED";
+    } else if (text.includes("INTERNAL") || text.includes("SERVER_ERROR")) {
+      reason = "SERVER_ERROR";
     }
-    if (text.includes("INTERNAL") || text.includes("SERVER_ERROR")) {
-      return "SERVER_ERROR";
+
+    let retryAfterMs: number | undefined;
+    try {
+      const data = JSON.parse(text);
+
+      const retryInfo = data?.error?.details?.find(
+        (d: unknown) => typeof d === 'object' && d !== null && '@type' in d && typeof d['@type'] === 'string' && d['@type'].includes('google.rpc.RetryInfo')
+      );
+
+      if (retryInfo && typeof retryInfo === 'object' && 'retryDelay' in retryInfo && typeof retryInfo.retryDelay === 'string') {
+        const match = retryInfo.retryDelay.match(/^([\d.]+)s$/);
+        if (match) {
+          retryAfterMs = parseFloat(match[1]) * 1000;
+        }
+      }
+    } catch {
+      // JSON parse failed or structure unexpected - continue without retryAfterMs
     }
+
+    return { reason, retryAfterMs };
   } catch {
-    // ignore
+    return { reason: null };
   }
-  return null;
 }
 
 /**
@@ -60,8 +85,8 @@ async function safeDiscardBody(response: Response): Promise<void> {
  * Makes a request to the Antigravity API with endpoint failover and retry logic.
  *
  * Tries endpoints in order (daily → autopush → prod) with exponential backoff
- * for capacity errors. Falls back to gemini-cli style for non-Claude models
- * when all antigravity endpoints are exhausted.
+ * for capacity errors. Falls back between styles for non-Claude models
+ * when endpoints are exhausted.
  *
  * @param payload - The request body.
  * @param accessToken - OAuth2 access token.
@@ -74,7 +99,10 @@ export async function makeAntigravityRequest(
   options: RequestOptions = {},
 ): Promise<Response> {
   const style = options.headerStyle ?? "antigravity";
-  const model = payload.model as string;
+  const originalModel = payload.model as string;
+  const resolvedModel = resolveModelForHeaderStyle(originalModel, style);
+  
+  const currentPayload = { ...payload, model: resolvedModel };
 
   const endpoints = style === "gemini-cli"
     ? [ANTIGRAVITY_ENDPOINT_PROD]
@@ -85,8 +113,9 @@ export async function makeAntigravityRequest(
   for (let i = 0; i < endpoints.length; i++) {
     const endpoint = endpoints[i];
     let capacityRetryCount = 0;
+    const MAX_CAPACITY_RETRIES = 3;
 
-    while (capacityRetryCount < 5) {
+    while (capacityRetryCount < MAX_CAPACITY_RETRIES) {
       const url = `${endpoint}/v1internal:streamGenerateContent?alt=sse`;
 
       const styleHeaders = getRandomizedHeaders(style);
@@ -94,23 +123,24 @@ export async function makeAntigravityRequest(
         'Content-Type': 'application/json',
         'Accept': 'text/event-stream',
         'Authorization': `Bearer ${accessToken}`,
-        'anthropic-beta': 'interleaved-thinking-2025-05-14',
         ...styleHeaders,
       };
 
+      if (isClaudeModel(resolvedModel) && resolvedModel.toLowerCase().includes('thinking')) {
+        headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+      }
+
+      // For antigravity style, we already have only User-Agent from styleHeaders.
+      // We do NOT add X-Goog-QuotaUser or X-Client-Device-Id.
+      // Plugin reference only sends User-Agent for antigravity requests.
       if (style === "antigravity") {
         delete headers['x-goog-user-project'];
-        if (options.refreshToken) {
-          const fingerprint = await getFingerprintHeaders(options.refreshToken);
-          headers["X-Goog-QuotaUser"] = fingerprint["X-Goog-QuotaUser"];
-          headers["X-Client-Device-Id"] = fingerprint["X-Client-Device-Id"];
-        }
       }
 
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload),
+        body: JSON.stringify(currentPayload),
       });
 
       if (response.ok) {
@@ -118,16 +148,20 @@ export async function makeAntigravityRequest(
       }
 
       if (response.status === 429 || response.status === 503) {
-        const reason = await parseErrorReason(response);
+        const { reason, retryAfterMs } = await parseErrorInfo(response);
 
-        if ((reason === "MODEL_CAPACITY_EXHAUSTED" || reason === "SERVER_ERROR") && capacityRetryCount < 4) {
-          const baseDelayMs = 1000;
-          const maxDelayMs = 8000;
-          const exponentialDelay = Math.min(baseDelayMs * Math.pow(2, capacityRetryCount), maxDelayMs);
-          const jitter = Math.floor(Math.random() * 500);
-          const waitMs = exponentialDelay + jitter;
+        if ((reason === "MODEL_CAPACITY_EXHAUSTED" || reason === "SERVER_ERROR") && capacityRetryCount < MAX_CAPACITY_RETRIES) {
+          let waitMs: number;
 
-          console.warn(`[Client] Server busy (${reason}) on ${endpoint}, exponential backoff ${waitMs}ms (attempt ${capacityRetryCount + 1})`);
+          if (retryAfterMs !== undefined) {
+            waitMs = retryAfterMs;
+          } else {
+            const baseMs = 5000 * Math.pow(2, capacityRetryCount);
+            const jitter = Math.floor(Math.random() * 2000) - 1000;
+            waitMs = Math.min(baseMs + jitter, 30000);
+          }
+
+          console.warn(`[Client] Server busy (${reason}) on ${endpoint}, backoff ${waitMs}ms (attempt ${capacityRetryCount + 1}/${MAX_CAPACITY_RETRIES})`);
           await safeDiscardBody(response);
           await sleep(waitMs);
 
@@ -139,16 +173,37 @@ export async function makeAntigravityRequest(
         break;
       }
 
+      if (response.status === 403) {
+        const errorText = await response.text();
+        lastError = `Antigravity API error (403): ${errorText}`;
+        console.error(`[Client] Error on ${endpoint}:`, lastError);
+
+        await safeDiscardBody(response);
+
+        if (i < endpoints.length - 1) {
+          console.warn(`[Client] Endpoint ${endpoint} returned 403, trying next...`);
+          break;
+        }
+
+        if (!isClaudeModel(resolvedModel)) {
+          console.warn(`[Client] Endpoint ${endpoint} returned 403, will try style fallback...`);
+          break;
+        }
+
+        throw new Error(lastError);
+      }
+
       const errorText = await response.text();
       lastError = `Antigravity API error (${response.status}): ${errorText}`;
+      console.error(`[Client] Error on ${endpoint}:`, lastError);
 
       if (i < endpoints.length - 1) {
         console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, trying next...`);
         break;
       }
 
-      if (style === "antigravity" && !isClaudeModel(model)) {
-        console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, will try Gemini CLI fallback...`);
+      if (!isClaudeModel(resolvedModel)) {
+        console.warn(`[Client] Endpoint ${endpoint} returned ${response.status}, will try style fallback...`);
         break;
       }
 
@@ -156,17 +211,20 @@ export async function makeAntigravityRequest(
     }
   }
 
-  if (style === "antigravity" && !isClaudeModel(model)) {
-    console.warn('[Client] All antigravity endpoints exhausted, trying Gemini CLI fallback...');
-
-    const cliModel = resolveModelForHeaderStyle(model, "gemini-cli");
-    const { requestType: _, userAgent: _ua, requestId: _rid, ...cleanPayload } = payload;
-    const cliPayload = { ...cleanPayload, model: cliModel };
-
-    return makeAntigravityRequest(cliPayload, accessToken, {
-      ...options,
-      headerStyle: "gemini-cli",
-    });
+  // Style fallback logic for Gemini models
+  if (!isClaudeModel(resolvedModel)) {
+    const nextStyle = style === "antigravity" ? "gemini-cli" : "antigravity";
+    console.warn(`[Client] ${style} style exhausted or failed, trying ${nextStyle} fallback...`);
+    
+    try {
+      return await makeAntigravityRequest(payload, accessToken, {
+        ...options,
+        headerStyle: nextStyle,
+      });
+    } catch (fallbackError) {
+      console.warn(`[Client] ${nextStyle} fallback also failed:`, fallbackError);
+      throw new Error(lastError ?? `All endpoints exhausted for both styles`);
+    }
   }
 
   throw new Error(lastError ?? `All endpoints exhausted for ${style} style`);

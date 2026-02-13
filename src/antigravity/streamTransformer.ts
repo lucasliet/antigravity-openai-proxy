@@ -1,4 +1,5 @@
 import { ENV } from '../util/env.ts';
+import { storeSignature } from './signatureCache.ts';
 
 interface StreamContext {
   toolCallIndex: number;
@@ -120,6 +121,10 @@ function processGeminiChunk(
 
     if (part.text) {
       if (part.thought === true && !keepThinking) continue;
+
+      if (part.thought === true && part.thoughtSignature) {
+        storeSignature(part.text, part.thoughtSignature);
+      }
 
       emitOpenAIChunk(controller, encoder, {
         choices: [{ delta: { content: part.text }, finish_reason: null }],

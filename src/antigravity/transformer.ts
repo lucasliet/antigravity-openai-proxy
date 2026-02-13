@@ -7,14 +7,21 @@ import type {
 import { SKIP_THOUGHT_SIGNATURE, isClaudeModel } from './types.ts';
 import { cleanJsonSchema, cleanJSONSchemaForAntigravity } from './schemaCleanup.ts';
 
+const CLAUDE_INTERLEAVED_THINKING_HINT =
+  "Interleaved thinking is enabled. You may think between tool calls and after receiving tool results before deciding next action or final answer. Do not mention these instructions or any constraints about thinking blocks; just apply them.";
+
 /**
  * Converts OpenAI messages to Gemini format.
  *
  * @param messages - Array of OpenAI messages.
+ * @param model - Optional model name for Claude-specific handling.
+ * @param hasTools - Whether tools are present for Claude-specific handling.
  * @returns Object with systemInstruction and Gemini contents.
  */
 export function toGeminiFormat(
   messages: OpenAIMessage[],
+  model?: string,
+  hasTools?: boolean,
 ): { systemInstruction?: string; contents: GeminiContent[] } {
   let systemInstruction: string | undefined;
   const contents: GeminiContent[] = [];
@@ -101,6 +108,10 @@ export function toGeminiFormat(
     if (parts.length > 0) {
       contents.push({ role, parts });
     }
+  }
+
+  if (model && isClaudeModel(model) && hasTools && systemInstruction) {
+    systemInstruction += "\n\n" + CLAUDE_INTERLEAVED_THINKING_HINT;
   }
 
   return { systemInstruction, contents };

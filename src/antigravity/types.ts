@@ -38,6 +38,7 @@ export interface AntigravityRequestPayload {
         parameters: Record<string, unknown>;
       }>;
     }>;
+    toolConfig?: Record<string, unknown>;
     generationConfig?: Record<string, unknown>;
     thinking?: {
       type: 'enabled';
@@ -47,6 +48,7 @@ export interface AntigravityRequestPayload {
       role: 'user';
       parts: Array<{ text: string }>;
     };
+    sessionId?: string;
   };
 }
 
@@ -91,10 +93,20 @@ export interface OpenAITool {
   };
 }
 
+export const ANTIGRAVITY_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
+const ANTIGRAVITY_ENDPOINT_AUTOPUSH = "https://autopush-cloudcode-pa.sandbox.googleapis.com";
+const ANTIGRAVITY_ENDPOINT_DAILY = "https://daily-cloudcode-pa.sandbox.googleapis.com";
+
 export const ANTIGRAVITY_ENDPOINTS = [
-  'https://cloudcode-pa.googleapis.com',
-  'https://autopush-cloudcode-pa.sandbox.googleapis.com',
-  'https://daily-cloudcode-pa.sandbox.googleapis.com',
+  ANTIGRAVITY_ENDPOINT_PROD,
+  ANTIGRAVITY_ENDPOINT_AUTOPUSH,
+  ANTIGRAVITY_ENDPOINT_DAILY,
+] as const;
+
+export const ANTIGRAVITY_LOAD_ENDPOINTS = [
+  ANTIGRAVITY_ENDPOINT_PROD,
+  ANTIGRAVITY_ENDPOINT_DAILY,
+  ANTIGRAVITY_ENDPOINT_AUTOPUSH,
 ] as const;
 
 export const SKIP_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
@@ -179,14 +191,11 @@ export function getRandomizedHeaders(style: HeaderStyle): Record<string, string>
     };
   }
 
+  // Antigravity mode: Match Antigravity Manager behavior
+  // AM only sends User-Agent on content requests — no X-Goog-Api-Client, no Client-Metadata header
+  // (ideType=ANTIGRAVITY goes in request body metadata, not as a header)
   return {
     "User-Agent": randomFrom(ANTIGRAVITY_USER_AGENTS),
-    "X-Goog-Api-Client": randomFrom(ANTIGRAVITY_API_CLIENTS),
-    "Client-Metadata": JSON.stringify({
-      ideType: "IDE_UNSPECIFIED",
-      platform: "PLATFORM_UNSPECIFIED",
-      pluginType: "GEMINI",
-    }),
   };
 }
 
@@ -210,7 +219,24 @@ export function resolveModelForHeaderStyle(model: string, style: HeaderStyle): s
   return withoutTier;
 }
 
-export const ANTIGRAVITY_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
+export interface AntigravityUserTier {
+  id?: string;
+  isDefault?: boolean;
+}
+
+export interface LoadCodeAssistPayload {
+  cloudaicompanionProject?: string | { id?: string };
+  allowedTiers?: AntigravityUserTier[];
+}
+
+export interface OnboardUserPayload {
+  done?: boolean;
+  response?: {
+    cloudaicompanionProject?: {
+      id?: string;
+    };
+  };
+}
 
 export const SUPPORTED_MODELS = [
   { id: 'gemini-3-flash', owned_by: 'google' },
