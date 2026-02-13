@@ -12,6 +12,7 @@ export function listModels(c: Context): Response {
     object: 'list',
     data: SUPPORTED_MODELS.map((m) => ({
       id: m.id,
+      name: m.name,
       object: 'model',
       created: 1700000000,
       owned_by: m.owned_by,

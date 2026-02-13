@@ -21,6 +21,7 @@ Deno.test('@DisplayName("Listagem de modelos suportados pela API")', async () =>
     if (body.data.length > 0) {
       const model = body.data[0];
       assertExists(model.id);
+      assertExists(model.name);
       assertEquals(model.object, 'model');
       assertExists(model.owned_by);
     }

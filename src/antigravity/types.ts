@@ -239,11 +239,11 @@ export interface OnboardUserPayload {
 }
 
 export const SUPPORTED_MODELS = [
-  { id: 'gemini-3-flash', owned_by: 'google' },
-  { id: 'gemini-3-pro', owned_by: 'google' },
-  { id: 'gemini-2.5-flash', owned_by: 'google' },
-  { id: 'gemini-2.5-pro', owned_by: 'google' },
-  { id: 'claude-sonnet-4-5', owned_by: 'anthropic' },
-  { id: 'claude-sonnet-4-5-thinking', owned_by: 'anthropic' },
-  { id: 'claude-opus-4-6-thinking', owned_by: 'anthropic' },
+  { id: 'gemini-3-flash', name: 'Gemini 3 Flash', owned_by: 'google' },
+  { id: 'gemini-3-pro', name: 'Gemini 3 Pro', owned_by: 'google' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', owned_by: 'google' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', owned_by: 'google' },
+  { id: 'claude-sonnet-4-5', name: 'Claude 3.5 Sonnet', owned_by: 'anthropic' },
+  { id: 'claude-sonnet-4-5-thinking', name: 'Claude 3.5 Sonnet (Thinking)', owned_by: 'anthropic' },
+  { id: 'claude-opus-4-6-thinking', name: 'Claude 4.6 Opus (Thinking)', owned_by: 'anthropic' },
 ] as const;
